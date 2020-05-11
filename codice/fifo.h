@@ -2,4 +2,14 @@
 /// @brief Contiene la definizioni di variabili e
 ///         funzioni specifiche per la gestione delle FIFO.
 
-#pragma once
+#pragma once //direttiva durante la compilazione per evitare errori
+#include <unistd.h>
+#ifndef _FIFO_HH
+#define _FIFO_HH
+void mk_fifo(const char *pathname, mode_t mode);
+int open_fifo(const char *pathname, int flags);
+int read_fifo(int fifods, void *buf, size_t count, char *who);
+void write_fifo(int fifo_ds, void *buf, size_t count);
+void close_fifo(int fifo_ds);
+void unlink_fifo(const char *pathname);
+#endif
