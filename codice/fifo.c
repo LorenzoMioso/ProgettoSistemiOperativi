@@ -2,8 +2,15 @@
 /// @brief Contiene l'implementazione delle funzioni
 ///         specifiche per la gestione delle FIFO.
 
-#include "err_exit.h"
+#include "defines.h"
 #include "fifo.h"
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+
 
 void mk_fifo(const char *pathname, mode_t mode){
 	if (mkfifo(pathname, mode) == -1)
