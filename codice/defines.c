@@ -5,8 +5,10 @@
 #include "defines.h"
 
 #include <errno.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 void print_message(Message *m) {
     printf("Message:\n");
@@ -18,38 +20,53 @@ void print_message(Message *m) {
 }
 
 void print_acknowledgement(Acknowledgment *a) {
-    printf("Pid sender: %d\n", a->pid_sender);
-    printf("Pid receiver: %d\n", a->pid_receiver);
-    printf("Message id: %d\n", a->message_id);
-    printf("Timestamp: %s\n", ctime(a->timestamp));
+    char buff[100];
+    strftime(buff, 100, "%Y-%m-%d %H:%M:%S", localtime(&a->timestamp));
+    printf("%d, ", a->pid_sender);
+    printf("%d, ", a->pid_receiver);
+    printf("%s\n", buff);
 }
 
-void print_board(int *mat, int row, int col) {
-    int j;
-    for (int i = 0; i < row; i++) {
-        printf("|");
-        for (j = 0; j < col - 1; j++) {
-            printf("%d,", mat[i + j * 10]);
-        }
-        printf("%d|\n", mat[i + j * 10]);
+int eq_acknowledgement(Acknowledgment *ack1, Acknowledgment *ack2) {
+    return memcmp(ack1, ack2, sizeof(Acknowledgment));
+}
+void print_ackList(Acknowledgment *ack_list, size_t size) {
+    for (int i = 0; i < size; i++) {
+        printf("sono nel for \n");
+        print_acknowledgement(&ack_list[i]);
     }
 }
+void add_ackList(Acknowledgment *ack, Acknowledgment *ack_list, size_t size) {}
+void del_ackList(Acknowledgment *ack, Acknowledgment *ack_list, size_t size);
 
 void set_table_val(int *mat, int x, int y, int val) { mat[10 * x + y] = val; }
+int get_table_val(int *mat, int x, int y) { return mat[10 * x + y]; }
 
+// scrive in nearby_pids tutti i pid che trova vicino a (x,y) escluso
+// scorre tutta la matrice
+// prende incosiderazione solo i punti che sitrovano a una distanza < di
+// max_dist da (x,y) se il nella cella ce un numero != 0 lo mette in nearby_pids
+// (x1,y1) e vicino di (x1,y1)
 void nearby_pids(int *mat, int row, int col, int x, int y, int max_dist,
-                 int pid_child, int pid_chilidren[], int is_near[],
-                 int num_child) {
-    int dist, j = 0;
+                 int pid_child, int is_near[], int num_child) {
+    int dist, k = 0, j = 0;
     for (int i = 0; i < row; i++) {
         for (j = 0; j < col; j++) {
+            dist = dist_euclid(x, y, i, j);
+            if (dist <= max_dist) {
+                int pid = get_table_val(mat, i, j);
+                if (pid != 0) {
+                    is_near[k] = pid;
+                    k++;
+                }
+            }
         }
     }
 }
-
-void print_board_status(int pos_device, int msg_id) {}
-
-void errExit(const char *msg) {
-    perror(msg);
-    exit(1);
+int dist_euclid(int x1, int y1, int x2, int y2) {
+    return (int)sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
 }
+void set_zero(int arr[], int size) {
+    for (int i = 0; i < size; i++) arr[i] = 0;
+}
+void print_board_status(int pos_device, int msg_id) {}
