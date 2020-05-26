@@ -28,20 +28,84 @@ void print_acknowledgement(Acknowledgment *a) {
 }
 
 int eq_acknowledgement(Acknowledgment *ack1, Acknowledgment *ack2) {
-    return memcmp(ack1, ack2, sizeof(Acknowledgment));
+    int ret = 0;
+    if (ack1->message_id == ack2->message_id &&
+        ack1->pid_receiver == ack2->pid_receiver &&
+        ack1->pid_sender == ack2->pid_sender)
+        ret = 1;
+    return ret;
 }
-void print_ackList(Acknowledgment *ack_list, size_t size) {
+
+void print_ackList(AckList *ack_list, size_t size) {
+    Acknowledgment null = {0};
     for (int i = 0; i < size; i++) {
-        printf("sono nel for \n");
-        print_acknowledgement(&ack_list[i]);
+        if (eq_acknowledgement(&ack_list->list[i], &null) == 0)
+            print_acknowledgement(&ack_list->list[i]);
     }
 }
-void add_ackList(Acknowledgment *ack, Acknowledgment *ack_list, size_t size) {}
-void del_ackList(Acknowledgment *ack, Acknowledgment *ack_list, size_t size);
-
+int add_ackList(Acknowledgment *ack, AckList *ack_list, size_t size) {
+    if (exists_ackList(ack, ack_list, size) == 0) {
+        int i = 0;
+        Acknowledgment null = {0};
+        while (i < size) {
+            if (eq_acknowledgement(&ack_list->list[i], &null) == 1) {
+                ack_list->list[i] = *ack;
+                return 0;
+            }
+            i++;
+        }
+    }
+    return -1;
+}
+int del_ackList(Acknowledgment *ack, AckList *ack_list, size_t size) {
+    int i = 0;
+    Acknowledgment null = {0};
+    while (i < size) {
+        if (eq_acknowledgement(&ack_list->list[i], ack) == 0) {
+            ack_list->list[i] = null;
+            return 0;
+        }
+        i++;
+    }
+    return -1;
+}
+int exists_ackList(Acknowledgment *ack, AckList *ack_list, size_t size) {
+    int i = 0;
+    while (i < size) {
+        if (eq_acknowledgement(&ack_list->list[i], ack) == 0) {
+            return 0;
+        }
+        i++;
+    }
+    return 1;
+}
+int is_acked(Message *msg, AckList *ack_list, size_t size) {
+    int i = 0;
+    Acknowledgment null = {0};
+    while (i < size) {
+        if (eq_acknowledgement(&ack_list->list[i], &null) == 0) {
+            Acknowledgment ack = ack_list->list[i];
+            if (ack.message_id == msg->message_id &&
+                ack.pid_receiver == msg->pid_receiver) {
+                return 1;
+            }
+        }
+        i++;
+    }
+    return 0;
+}
+void print_board(int *mat, int row, int col) {
+    int j;
+    for (int i = 0; i < row; i++) {
+        printf("|");
+        for (j = 0; j < col - 1; j++) {
+            printf("%d,", mat[i + j * 10]);
+        }
+        printf("%d|\n", mat[i + j * 10]);
+    }
+}
 void set_table_val(int *mat, int x, int y, int val) { mat[10 * x + y] = val; }
 int get_table_val(int *mat, int x, int y) { return mat[10 * x + y]; }
-
 // scrive in nearby_pids tutti i pid che trova vicino a (x,y) escluso
 // scorre tutta la matrice
 // prende incosiderazione solo i punti che sitrovano a una distanza < di

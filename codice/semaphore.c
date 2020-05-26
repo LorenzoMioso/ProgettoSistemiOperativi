@@ -36,3 +36,18 @@ void delete_sem_set(int semid) {
     if (semctl(semid, 0 /*ignored*/, IPC_RMID, NULL) == -1)
         ErrExit("semctl IPC_RMID failed");
 }
+
+void printSemaphoresValue(int semid, int semnum) {
+    unsigned short semVal[semnum];
+    union semun arg;
+    arg.array = semVal;
+
+    // get the current state of the set
+    if (semctl(semid, 0 /*ignored*/, GETALL, arg) == -1)
+        ErrExit("semctl GETALL failed");
+
+    // print the semaphore's value
+    printf("semaphore set state: ");
+    for (int i = 0; i < semnum; i++) printf("%d ", semVal[i]);
+    printf("\n");
+}

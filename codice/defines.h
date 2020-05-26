@@ -7,6 +7,8 @@
 #define _DEFINES_HH
 #pragma once
 
+#define MAX_ACK 100
+#define DEV_NUM 5
 typedef struct {
     pid_t pid_sender;
     pid_t pid_receiver;
@@ -22,12 +24,22 @@ typedef struct {
     time_t timestamp;
 } Acknowledgment;
 
-void print_message(Message *m);
+typedef struct {
+    Acknowledgment list[MAX_ACK];
+} AckList;
+
+typedef struct {
+    long mtype;
+    Acknowledgment group[DEV_NUM];
+} AckGroup;
+
 void print_acknowledgement(Acknowledgment *a);
 int eq_acknowledgement(Acknowledgment *ack1, Acknowledgment *ack2);
-void print_ackList(Acknowledgment *ack_list, size_t size);
-void add_ackList(Acknowledgment *ack, Acknowledgment *ack_list, size_t size);
-void del_ackList(Acknowledgment *ack, Acknowledgment *ack_list, size_t size);
+void print_ackList(AckList *ack_list, size_t size);
+int add_ackList(Acknowledgment *ack, AckList *ack_list, size_t size);
+int is_acked(Message *msg, AckList *ack_list, size_t size);
+int del_ackList(Acknowledgment *ack, AckList *ack_list, size_t size);
+int exists_ackList(Acknowledgment *ack, AckList *ack_list, size_t size);
 void print_board_status(int pos_device, int msg_id);
 void print_board(int *mat, int row, int col);
 void set_table_val(int *mat, int x, int y, int val);
