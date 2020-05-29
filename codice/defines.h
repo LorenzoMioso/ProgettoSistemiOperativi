@@ -34,13 +34,15 @@ typedef struct {
 } AckQueue;
 
 void print_ackQueue(AckList *ack_list, size_t size);
-void print_board_status(int pos_device, int msg_id);
+void print_board_status(int *board, int col, int row, int *pidArr, size_t size,
+                        int step);
 void print_board(int *mat, int row, int col);
 int acknowledgementToString(Acknowledgment *a, char *buff);
 int ackedMsgToString(Message *msg, Acknowledgment *ack_list, size_t size,
                      char *buff);
 void set_table_val(int *mat, int x, int y, int val);
 int get_table_val(int *mat, int x, int y);
+void whare_table_val(int *mat, int row, int col, int *x, int *y, int val);
 void nearby_pids(int *mat, int row, int col, int x, int y, int max_dist,
                  int pid_child, int is_near[], int num_child);
 int dist_euclid(int x1, int y1, int x2, int y2);

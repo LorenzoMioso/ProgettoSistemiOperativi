@@ -158,6 +158,18 @@ void print_board(int *mat, int row, int col) {
 }
 void set_table_val(int *mat, int x, int y, int val) { mat[10 * x + y] = val; }
 int get_table_val(int *mat, int x, int y) { return mat[10 * x + y]; }
+void whare_table_val(int *mat, int row, int col, int *x, int *y, int val) {
+    int j;
+    for (int i = 0; i < row; i++) {
+        for (j = 0; j < col; j++) {
+            if (mat[i + j * 10] == val) {
+                *x = i;
+                *y = j;
+            }
+        }
+    }
+}
+
 // scrive in nearby_pids tutti i pid che trova vicino a (x,y) escluso
 // scorre tutta la matrice
 // prende incosiderazione solo i punti che sitrovano a una distanza < di
@@ -184,4 +196,13 @@ int dist_euclid(int x1, int y1, int x2, int y2) {
 void set_zero(int arr[], int size) {
     for (int i = 0; i < size; i++) arr[i] = 0;
 }
-void print_board_status(int pos_device, int msg_id) {}
+void print_board_status(int *board, int col, int row, int *pidArr, size_t size,
+                        int step) {
+    printf("Step %d: device positions ########################\n", step);
+    for (int i = 0; i < size; i++) {
+        int x = -1, y = -1;
+        whare_table_val(board, row, col, &x, &y, *(pidArr + i));
+        printf("%d %d %d\n", *(pidArr + i), x, y);
+    }
+    printf("#################################################\n");
+}

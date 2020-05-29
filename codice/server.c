@@ -51,11 +51,11 @@ int semProcId;
 char child_fifo_path[SIZE_FIFO_PATH];
 int child_fifo_fd;
 int move = 0;
+int step;
 
 void serverSigHandler(int sig);
 void childSigHandler(int sig);
 void ackManagerSigHandler(int sig);
-void set_table_val_sem(int *board, int x, int y, int val, int sem_id);
 void get_fifo_path_child(char *path, pid_t pid);
 int get_fifo_child(char *fifo_path);
 
@@ -199,7 +199,6 @@ int main(int argc, char *argv[]) {
                         semOp(semAckListId, 0, -1);
                         if (add_ackArray(&ack_buff, ackList->arr, MAX_ACK) ==
                             -1) {
-                            printf("Ack non aggiunto\n");
                             numRead = 0;
                         }
                         semOp(semAckListId, 0, 1);
@@ -222,8 +221,11 @@ int main(int argc, char *argv[]) {
                                 msg_buff.pid_receiver = is_near[i];
                                 // check if device has already recieved the
                                 // mesage by checking on ack list
-                                if (is_ackedArray(&msg_buff, ackList->arr,
-                                                  MAX_ACK) == 0) {
+                                semOp(semAckListId, 0, -1);
+                                int isAckedArray = is_ackedArray(
+                                    &msg_buff, ackList->arr, MAX_ACK);
+                                semOp(semAckListId, 0, 1);
+                                if (isAckedArray == 0) {
                                     char nearby_fifo_path[SIZE_FIFO_PATH];
                                     get_fifo_path_child(nearby_fifo_path,
                                                         is_near[i]);
@@ -241,11 +243,17 @@ int main(int argc, char *argv[]) {
                         // printf("<D%d>Tocca a me \n", child);
                         semOp(semProcId, child, -1);
 
-                        if (x != -1 && y != -1)
-                            set_table_val_sem(board, x, y, 0, semBoardId);
+                        if (x != -1 && y != -1) {
+                            semOp(semBoardId, 0, -1);
+                            set_table_val(board, x, y, 0);
+                            semOp(semBoardId, 0, 1);
+                        }
                         x = posLine[POSX(child)] - '0';
                         y = posLine[POSY(child)] - '0';
-                        set_table_val_sem(board, x, y, getpid(), semBoardId);
+
+                        semOp(semBoardId, 0, -1);
+                        set_table_val(board, x, y, getpid());
+                        semOp(semBoardId, 0, 1);
 
                         move = 0;
                         // printf("<D%d>Mi sto muovendo\n", child);
@@ -257,118 +265,72 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        sleep(5);
+        sleep(1);
 
         while (1) {
+            sleep(1);
+            step++;
             int numRead = read(pos_fd, posLine, LINE_SIZE);
             if (numRead == -1) ErrExit("error reading position file");
-            if (numRead == 0)
-                ;  // printf("<server> File posizioni terminato
-                   // \n");
+            if (numRead == 0) printf("<server> File posizioni terminato\n");
             if (numRead > 0) {
-                //  kill(0, SIGCONT);
                 kill(pid_child[0], SIGUSR1);
                 kill(pid_child[1], SIGUSR1);
                 kill(pid_child[2], SIGUSR1);
                 kill(pid_child[3], SIGUSR1);
                 kill(pid_child[4], SIGUSR1);
-                sleep(1);
-                // print_board(board, BOARD_SIZE, BOARD_SIZE);
-                // printf("--------------------------- \n");
             }
-            sleep(2);
+            sleep(1);
+            semOp(semBoardId, 0, -1);
+            print_board_status(board, BOARD_SIZE, BOARD_SIZE, &pid_child[0],
+                               DEV_NUM, step);
+            semOp(semBoardId, 0, 1);
         }
     }
 
     return 0;
 }
 void init() {
-    //-----------------------------------------------------------------------------
     // Allocate a shared memory segment for board
-    //-----------------------------------------------------------------------------
-
     printf("<Server> allocating a shared memory segment for board\n");
     shmBoardId =
         alloc_shared_memory(IPC_PRIVATE, sizeof(int) * BOARD_SIZE * BOARD_SIZE);
-
-    //-----------------------------------------------------------------------------
     // Attach the shared memory segment for board
-    //-----------------------------------------------------------------------------
-
     printf("<Server> attaching the shared memory segment for board\n");
     board = (int *)get_shared_memory(shmBoardId, 0);
-
-    //-----------------------------------------------------------------------------
     // Allocate a shared memory segment for scharing positin (sever ->
     // childern)
-    //-----------------------------------------------------------------------------
-
     printf("<Server> allocating a shared memory segment for board\n");
     shmPosId = alloc_shared_memory(IPC_PRIVATE, sizeof(char) * LINE_SIZE);
-
-    //-----------------------------------------------------------------------------
     // Attach shared memory segment for scharing positin (sever -> childern)
-    //-----------------------------------------------------------------------------
-
     printf("<Server> attaching the shared memory segment for board\n");
     posLine = (char *)get_shared_memory(shmPosId, 0);
-
-    //-----------------------------------------------------------------------------
     // Allocate a shared memory segment for acknowledgment list
-    //-----------------------------------------------------------------------------
-
     printf(
         "<Server> allocating a shared memory segment for acknowledgment "
         "list\n");
     shmAckListId = alloc_shared_memory(IPC_PRIVATE, sizeof(AckList));
-
-    //-----------------------------------------------------------------------------
     // Attach the shared memory segment for acknowledgment list
-    //-----------------------------------------------------------------------------
-
     printf(
         "<Server> attaching the shared memory segment acknowledgment "
         "list\n");
     ackList = (AckList *)get_shared_memory(shmAckListId, 0);
-
-    //-----------------------------------------------------------------------------
     // Create a semaphore for board access
-    //-----------------------------------------------------------------------------
-
     printf("<Server> creating a semaphore set for board access.\n");
     semBoardId = create_sem_set(1);
-
-    //-----------------------------------------------------------------------------
     // Set semaphore at 1 to allow board access
-    //-----------------------------------------------------------------------------
-
     printf("<Server> Setting board semaphore to 1.\n");
     semOp(semBoardId, 0, 1);
-
-    //-----------------------------------------------------------------------------
     // Create a semaphore for ack list access
-    //-----------------------------------------------------------------------------
-
     printf("<Server> creating a semaphore set for ack list access.\n");
     semAckListId = create_sem_set(1);
-
-    //-----------------------------------------------------------------------------
     // Set semaphore at 1 to allow ack list access
-    //-----------------------------------------------------------------------------
-
     printf("<Server> Setting ack list semaphore to 1.\n");
     semOp(semAckListId, 0, 1);
-    //-----------------------------------------------------------------------------
     // Create a semaphore set of 5 for process syncronization
-    //-----------------------------------------------------------------------------
-
     printf("<Server> creating a semaphore set for process syncronization\n");
     semProcId = create_sem_set(5);
-
-    //-----------------------------------------------------------------------------
     // Set semaphore at 1 to allow first process to start
-    //-----------------------------------------------------------------------------
-
     printf("<Server> Setting first process semaphore to 1.\n");
     semOp(semProcId, 0, 1);
 }
@@ -403,11 +365,11 @@ void quit() {
 void serverSigHandler(int sig) { quit(); }
 void childSigHandler(int sig) {
     if (sig == SIGUSR1) {
-        // printf("SIGUSR1 segnale ricevuto\n");
         move = 1;
     } else if (sig == SIGTERM) {
         printf("<Child> SIGTERM ricevuto\n");
         close_fifo(child_fifo_fd);
+        unlink_fifo(child_fifo_path);
         exit(0);
     }
 }
@@ -421,20 +383,8 @@ void ackManagerSigHandler(int sig) {
         exit(0);
     }
 }
-void set_table_val_sem(int *board, int x, int y, int val, int sem_id) {
-    // lock semaphore
-    semOp(sem_id, 0, -1);
-    // set value on the table
-    set_table_val(board, x, y, val);
-    // unlock semaphore
-    semOp(sem_id, 0, 1);
-}
 void get_fifo_path_child(char *path, pid_t pid) {
-    char fifo_name[22] = "/tmp/dev_fifo.";
-    char pid_to_strg[12];
-    sprintf(pid_to_strg, "%d", pid);
-    strcat(fifo_name, pid_to_strg);
-    strcpy(path, fifo_name);
+    sprintf(path, "/tmp/dev_fifo.%d", pid);
 }
 int get_fifo_child(char *fifo_path) {
     mk_fifo(fifo_path, IPC_CREAT | S_IRUSR | S_IWUSR);

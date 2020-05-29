@@ -4,6 +4,7 @@
 
 #include "fifo.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -25,8 +26,8 @@ int open_fifo(const char *pathname, int flags) {
 int read_fifo(int fifods, void *buf, size_t count) {
     int bR = read(fifods, buf, count);
     // Checking the number of bytes from the FIFO
-    // if (bR == -1) printf("Read fifo failed\n");
-    // ErrExit("Read fifo failed");
+    if (bR == -1 && errno != EAGAIN)  // printf("Read fifo failed\n");
+        ErrExit("Read fifo failed");
     return bR;
 }
 void write_fifo(int fifo_ds, void *buf, size_t count) {
