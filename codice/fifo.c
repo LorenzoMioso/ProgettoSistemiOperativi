@@ -25,7 +25,7 @@ int open_fifo(const char *pathname, int flags) {
 int read_fifo(int fifods, void *buf, size_t count) {
     int bR = read(fifods, buf, count);
     // Checking the number of bytes from the FIFO
-    if (bR == -1) printf("Read fifo failed\n");
+    // if (bR == -1) printf("Read fifo failed\n");
     // ErrExit("Read fifo failed");
     return bR;
 }

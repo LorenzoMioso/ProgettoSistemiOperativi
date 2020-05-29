@@ -126,26 +126,28 @@ int main(int argc, char *argv[]) {
         msqid = msgget(msgKey, IPC_CREAT | S_IRUSR | S_IWUSR);
         if (msqid == -1) ErrExit("msgget failed");
 
-        // creating message to send
-        AckGroup g;
-        g.mtype = 1;
-        size_t gSize = sizeof(AckGroup) - sizeof(long);
-        // sending message
-        // sending the message in the queue
-        if (msgsnd(msqid, &g, gSize, IPC_NOWAIT) == -1) {
-            if (errno == EAGAIN) {
-                printf("The queue was full! \n");
-            } else {
-                ErrExit("msgsnd failed");
-            }
-        }
+        int achedId;
+        AckQueue q;
+        size_t gSize = sizeof(AckQueue) - sizeof(long);
 
         // managing acks
         while (1) {
             sleep(5);
-            printf("AckList:\n");
+            printf("AckArray:\n");
             semOp(semAckListId, 0, -1);
-            print_ackList(ackList, MAX_ACK);
+            print_ackArray(ackList->arr, MAX_ACK);
+            // trovo un messaggio confermato da tutti i devices
+            achedId = idAckedByAll(ackList->arr, MAX_ACK);
+            if (achedId != 0) {
+                // preparo il message da inviare nella queue
+                // mtype prende l'id confermato
+                q.mtype = achedId;
+                // inserisco gli ack nella messaggio
+                setAckQueue(q.arr, DEV_NUM, ackList->arr, MAX_ACK, achedId);
+                del_ackArrayById(achedId, ackList->arr, MAX_ACK);
+                if (msgsnd(msqid, &q, gSize, 0) == -1)
+                    printf("msgrcv failed\n");
+            }
             semOp(semAckListId, 0, 1);
         }
     } else {
@@ -174,8 +176,6 @@ int main(int argc, char *argv[]) {
                 int x = -1, y = -1;
 
                 while (1) {
-                    sleep(1);
-
                     Message msg_buff;
                     Acknowledgment ack_buff;
                     int is_near[CHILD_NUM];
@@ -197,7 +197,8 @@ int main(int argc, char *argv[]) {
                         // print_acknowledgement(&ack_buff);
                         // scrivo ack nellla lista di acks
                         semOp(semAckListId, 0, -1);
-                        if (add_ackList(&ack_buff, ackList, MAX_ACK) == -1) {
+                        if (add_ackArray(&ack_buff, ackList->arr, MAX_ACK) ==
+                            -1) {
                             printf("Ack non aggiunto\n");
                             numRead = 0;
                         }
@@ -221,8 +222,8 @@ int main(int argc, char *argv[]) {
                                 msg_buff.pid_receiver = is_near[i];
                                 // check if device has already recieved the
                                 // mesage by checking on ack list
-                                if (is_acked(&msg_buff, ackList, MAX_ACK) ==
-                                    0) {
+                                if (is_ackedArray(&msg_buff, ackList->arr,
+                                                  MAX_ACK) == 0) {
                                     char nearby_fifo_path[SIZE_FIFO_PATH];
                                     get_fifo_path_child(nearby_fifo_path,
                                                         is_near[i]);
@@ -279,14 +280,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    while (1) {
-        sleep(10);
-    }
     return 0;
 }
-
 void init() {
-    //-----------------------------------------------------------------------------
+    //-----------------------------------------------------------------------------
     // Allocate a shared memory segment for board
     //-----------------------------------------------------------------------------
 
@@ -417,6 +414,10 @@ void childSigHandler(int sig) {
 void ackManagerSigHandler(int sig) {
     if (sig == SIGTERM) {
         printf("<Ack> SIGTERM ricevuto\n");
+        printf("<Ack> Deleting message queue\n");
+        if (msgctl(msqid, IPC_RMID, NULL) == -1) {
+            ErrExit("Message queue could not be deleted.\n");
+        }
         exit(0);
     }
 }
@@ -428,7 +429,6 @@ void set_table_val_sem(int *board, int x, int y, int val, int sem_id) {
     // unlock semaphore
     semOp(sem_id, 0, 1);
 }
-
 void get_fifo_path_child(char *path, pid_t pid) {
     char fifo_name[22] = "/tmp/dev_fifo.";
     char pid_to_strg[12];

@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ipc.h>
+#include <sys/msg.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -28,6 +29,8 @@ int main(int argc, char* argv[]) {
         printf("The msg_queue_key must be greater than zero!\n");
         exit(1);
     }
+    int msqid = msgget(msgKey, S_IRUSR | S_IWUSR);
+    if (msqid == -1) ErrExit("msgget failed");
 
     char fifo_name[22] = "/tmp/dev_fifo.";
     char str_to_pid[12];
@@ -59,11 +62,31 @@ int main(int argc, char* argv[]) {
     if (fifo_fd == -1)
         printf("error opening fifo\n");
     else {
-        printf("fifo been opened\n");
         int numWrite = write(fifo_fd, &msg, sizeof(Message));
         if (numWrite == -1) printf("error writing message\n");
         if (numWrite == 0) printf("non e stato scritto nulla\n");
-        if (numWrite == sizeof(Message)) printf("Il messaggio e stato inviato\n");
+        if (numWrite == sizeof(Message)) {
+            printf("Attendo le conferme...\n");
+            // creo un messaggio della queue
+            AckQueue q;
+            size_t gSize = sizeof(AckQueue) - sizeof(long);
+            // ricevo il messaggio
+            if (msgrcv(msqid, &q, gSize, msg_id, 0) == -1)
+                printf("msgrcv failed\n");
+            // predispongo gli ack da scrivere nel file
+            char out[255];
+            int num = ackedMsgToString(&msg, q.arr, DEV_NUM, out);
+            // creo il file
+            char filePath[20];
+            sprintf(filePath, "out_%d.txt", msg_id);
+            int fileds =
+                open(filePath, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+            if (fileds == -1)
+                printf("Error creating file\n");
+            else
+                // scrivo gli ack nel file
+                write(fileds, out, num);
+        }
     }
 
     return 0;
