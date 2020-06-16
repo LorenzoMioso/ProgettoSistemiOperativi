@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <sys/sem.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #include "defines.h"
 #include "err_exit.h"
@@ -30,6 +31,26 @@ int create_sem_set(unsigned short sem_num) {
     arg.array = values;
 
     if (semctl(semid, 0, SETALL, arg) == -1) ErrExit("semctl SETALL failed");
+    return semid;
+}
+int create_sem_set_by_key(key_t key, unsigned short sem_num) {
+    // Create a new semaphore set with sem_num semaphores
+    int semid = semget(key, sem_num, IPC_CREAT | S_IRUSR | S_IWUSR);
+    if (semid == -1) ErrExit("semget failed");
+
+    // Initialize the semaphore set with semctl
+    union semun arg;
+    unsigned short values[sem_num];
+    for (int i = 0; i < sem_num; i++) values[i] = 0;
+    arg.array = values;
+
+    if (semctl(semid, 0, SETALL, arg) == -1) ErrExit("semctl SETALL failed");
+    return semid;
+}
+int get_sem_set_by_key(key_t key) {
+    // Create a new semaphore set with sem_num semaphores
+    int semid = semget(key, 0, IPC_CREAT | S_IRUSR | S_IWUSR);
+    if (semid == -1) ErrExit("semget failed");
     return semid;
 }
 void delete_sem_set(int semid) {

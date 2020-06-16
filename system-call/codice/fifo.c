@@ -26,14 +26,12 @@ int open_fifo(const char *pathname, int flags) {
 int read_fifo(int fifods, void *buf, size_t count) {
     int bR = read(fifods, buf, count);
     // Checking the number of bytes from the FIFO
-    if (bR == -1 && errno != EAGAIN)  // printf("Read fifo failed\n");
-        ErrExit("Read fifo failed");
+    if (bR == -1 && errno != EAGAIN) ErrExit("Read fifo failed");
     return bR;
 }
 void write_fifo(int fifo_ds, void *buf, size_t count) {
     // errExit al posto di printf?
     if (write(fifo_ds, buf, count) != count) ErrExit("write fifo failed\n");
-    // printf("write fifo failed\n");
 }
 void close_fifo(int fifo_ds) {
     if (close(fifo_ds) != 0) ErrExit("close fifo failed");

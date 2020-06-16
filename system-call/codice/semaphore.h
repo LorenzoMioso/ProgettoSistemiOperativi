@@ -6,6 +6,8 @@
 #ifndef _SEMAPHORE_HH
 #define _SEMAPHORE_HH
 
+#include <sys/sem.h>
+
 // definition of the union semun
 union semun {
     int val;
@@ -20,6 +22,8 @@ union semun {
 
 void semOp(int semid, unsigned short sem_num, short sem_op);
 int create_sem_set(unsigned short sem_num);
+int create_sem_set_by_key(key_t key, unsigned short sem_num);
+int get_sem_set_by_key(key_t key);
 void printSemaphoresValue(int semid, int semnum);
 void delete_sem_set(int semid);
 
