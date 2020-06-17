@@ -148,10 +148,10 @@ int main(int argc, char *argv[]) {
                 while (1) {
                     // rimuovo i nessaggi
 
-                    for (int i = 0; i < cont; i++) {
+                    for (int i = 0; i < MAX_ID; i++) {
                         new_Message(&msgs[i], 0, 0, 0, "", 0);
                         semOp(semIdMatrix, 0, -1);
-                        idMatrix->m[child][cont] = 0;
+                        idMatrix->m[child][i] = 0;
                         semOp(semIdMatrix, 0, 1);
                     }
                     // creo un array di messaggi
@@ -180,14 +180,14 @@ int main(int argc, char *argv[]) {
                     // printf("fuori dal while\n");
                     // eseguo il corpo del for per ogni messaggio in msgs
                     for (int i = 0; i < cont; i++) {
-                        printf("sono nel for\n");
-                        new_Message(&msg_buff, msgs[cont].pid_sender,
-                                    msgs[cont].pid_receiver,
-                                    msgs[cont].message_id, msgs[cont].message,
-                                    msgs[cont].max_distance);
-                        print_message(&msg_buff);
+                        // printf("sono nel for\n");
 
-                        printf("distance : %f", msg_buff.max_distance);
+                        new_Message(&msg_buff, msgs[i].pid_sender,
+                                    msgs[i].pid_receiver, msgs[i].message_id,
+                                    msgs[cont].message, msgs[i].max_distance);
+                        // print_message(&msg_buff);
+
+                        // printf("distance : %f", msg_buff.max_distance);
 
                         // trovo i vicini
                         // printf("cerco i vicini\n");
@@ -199,17 +199,17 @@ int main(int argc, char *argv[]) {
                                         CHILD_NUM);
                             semOp(semBoardId, 0, 1);
                         }
-                        printf("vicini : %d,%d,%d,%d,%d\n", is_near[0],
-                               is_near[1], is_near[2], is_near[3], is_near[4]);
+                        // printf("vicini : %d,%d,%d,%d,%d\n", is_near[0],
+                        //  is_near[1], is_near[2], is_near[3], is_near[4]);
                         // send message to nearby_pids
                         for (int j = 0; j < CHILD_NUM; j++) {
                             if (is_near[j] != 0 && is_near[j] != getpid()) {
-                                printf("ci sono dei vicini\n");
+                                //    printf("ci sono dei vicini\n");
                                 // change sender and receiver
                                 msg_buff.pid_sender = getpid();
                                 msg_buff.pid_receiver = is_near[j];
-                                // check if device has already received the
-                                // mesage by checking on ack list
+                                // check if device has already received
+                                // the mesage by checking on ack list
                                 semOp(semAckListId, 0, -1);
                                 int isAckedArray = is_ackedArray(
                                     &msg_buff, ackList->arr, MAX_ACK);
