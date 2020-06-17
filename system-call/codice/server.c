@@ -142,20 +142,18 @@ int main(int argc, char *argv[]) {
                 get_fifo_path_child(child_fifo_path, getpid());
                 child_fifo_fd = get_fifo_child(child_fifo_path);
                 int x = -1, y = -1;
-                Message msg_buff = {0};
-                Message msgs[MAX_ID];
-                int cont = 0;
                 while (1) {
-                    // rimuovo i nessaggi
-
+                    Message msg_buff = {0};
+                    Message msgs[MAX_ID];
+                    // rimuovo gli id
                     for (int i = 0; i < MAX_ID; i++) {
-                        new_Message(&msgs[i], 0, 0, 0, "", 0);
                         semOp(semIdMatrix, 0, -1);
                         idMatrix->m[child][i] = 0;
                         semOp(semIdMatrix, 0, 1);
                     }
+
                     // creo un array di messaggi
-                    cont = 0;
+                    int cont = 0;
                     while (1) {
                         int numRead = read_fifo(child_fifo_fd, &msg_buff,
                                                 sizeof(Message));
@@ -164,6 +162,18 @@ int main(int argc, char *argv[]) {
                         if (numRead == 0) break;
                         if (numRead == -1) break;
                         if (numRead == sizeof(Message)) {
+                            // invio l ack
+                            Acknowledgment ack_buff;
+                            new_Acknowledgment(&ack_buff, msg_buff.pid_sender,
+                                               msg_buff.pid_receiver,
+                                               msg_buff.message_id, time(NULL));
+                            semOp(semAckListId, 0, -1);
+                            if (add_ackArray(&ack_buff, ackList->arr,
+                                             MAX_ACK) == -1)
+                                numRead = 0;
+                            semOp(semAckListId, 0, 1);
+
+                            // metto il messaggio nella lista
                             new_Message(&msgs[cont], msg_buff.pid_sender,
                                         msg_buff.pid_receiver,
                                         msg_buff.message_id, msg_buff.message,
@@ -171,6 +181,7 @@ int main(int argc, char *argv[]) {
                             semOp(semIdMatrix, 0, -1);
                             idMatrix->m[child][cont] = msg_buff.message_id;
                             semOp(semIdMatrix, 0, 1);
+
                             cont++;
                         }
 
@@ -184,7 +195,7 @@ int main(int argc, char *argv[]) {
 
                         new_Message(&msg_buff, msgs[i].pid_sender,
                                     msgs[i].pid_receiver, msgs[i].message_id,
-                                    msgs[cont].message, msgs[i].max_distance);
+                                    msgs[i].message, msgs[i].max_distance);
                         // print_message(&msg_buff);
 
                         // printf("distance : %f", msg_buff.max_distance);
@@ -319,6 +330,7 @@ int main(int argc, char *argv[]) {
                 exit(0);
             }
         }
+        sleep(1);
         while (1) {
             step++;
             int numRead = read(pos_fd, posLine, LINE_SIZE);
