@@ -27,7 +27,11 @@
 #define POSY(c) c * 4 + 2
 #define USED_ID_PATH "/tmp/used.id"
 #define SEM_ID_FILE_KEY 1234
+#define MAX_ID 100
 
+int shmIdMatrix;
+int semIdMatrix;
+IdMatrix *idMatrix;
 int shmBoardId;
 int semBoardId;
 int *board;
@@ -46,7 +50,6 @@ int child;
 int semProcId;
 char child_fifo_path[SIZE_FIFO_PATH];
 int child_fifo_fd;
-int move = 0;
 int step;
 int semFileId;
 int usedIdFileDs;
@@ -104,9 +107,9 @@ int main(int argc, char *argv[]) {
         // managing acks
         while (1) {
             sleep(5);
-            printf("AckArray:\n");
+            // printf("AckArray:\n");
             semOp(semAckListId, 0, -1);
-            print_ackArray(ackList->arr, MAX_ACK);
+            // print_ackArray(ackList->arr, MAX_ACK);
             // trovo un messaggio confermato da tutti i devices
             achedId = idAckedByAll(ackList->arr, MAX_ACK);
             if (achedId != 0) {
@@ -122,7 +125,6 @@ int main(int argc, char *argv[]) {
             semOp(semAckListId, 0, 1);
         }
     } else {
-        printf("Server on going!\n");
         // Create and starting devices D1,...,D5 (5 children)
         for (child = 0; child < CHILD_NUM; ++child) {
             pid_child[child] = fork();
@@ -140,47 +142,72 @@ int main(int argc, char *argv[]) {
                 get_fifo_path_child(child_fifo_path, getpid());
                 child_fifo_fd = get_fifo_child(child_fifo_path);
                 int x = -1, y = -1;
+                Message msg_buff = {0};
+                Message msgs[MAX_ID];
+                int cont = 0;
                 while (1) {
-                    // initialize variables
-                    Message msg_buff = {0};
-                    Acknowledgment ack_buff = {0};
-                    int is_near[CHILD_NUM] = {0};
-                    int numRead = 0;
-                    int dist = 0;
+                    // rimuovo i nessaggi
 
-                    // receive message from pipe
-                    numRead =
-                        read_fifo(child_fifo_fd, &msg_buff, sizeof(Message));
+                    for (int i = 0; i < cont; i++) {
+                        new_Message(&msgs[i], 0, 0, 0, "", 0);
+                        semOp(semIdMatrix, 0, -1);
+                        idMatrix->m[child][cont] = 0;
+                        semOp(semIdMatrix, 0, 1);
+                    }
+                    // creo un array di messaggi
+                    cont = 0;
+                    while (1) {
+                        int numRead = read_fifo(child_fifo_fd, &msg_buff,
+                                                sizeof(Message));
+                        // printf("numRead:%d\n", numRead);
 
-                    if (numRead == sizeof(Message)) {
-                        // printf("<child%d> Messaggio ricevuto\n", child);
-                        dist = msg_buff.max_distance;
-                        // crea l ack
-                        new_Acknowledgment(&ack_buff, msg_buff.pid_sender,
-                                           msg_buff.pid_receiver,
-                                           msg_buff.message_id, time(NULL));
-                        semOp(semAckListId, 0, -1);
-                        if (add_ackArray(&ack_buff, ackList->arr, MAX_ACK) ==
-                            -1)
-                            numRead = 0;
-                        semOp(semAckListId, 0, 1);
+                        if (numRead == 0) break;
+                        if (numRead == -1) break;
+                        if (numRead == sizeof(Message)) {
+                            new_Message(&msgs[cont], msg_buff.pid_sender,
+                                        msg_buff.pid_receiver,
+                                        msg_buff.message_id, msg_buff.message,
+                                        msg_buff.max_distance);
+                            semOp(semIdMatrix, 0, -1);
+                            idMatrix->m[child][cont] = msg_buff.message_id;
+                            semOp(semIdMatrix, 0, 1);
+                            cont++;
+                        }
+
+                        // printf("dentro dal while\n");
                     }
 
-                    // find nerby devices
-                    set_zero(is_near, CHILD_NUM);
-                    if (x != -1 && y != -1) {
-                        semOp(semBoardId, 0, -1);
-                        nearby_pids(board, BOARD_SIZE, BOARD_SIZE, x, y, dist,
-                                    is_near, CHILD_NUM);
-                        semOp(semBoardId, 0, 1);
-                    }
-                    // send message to nearby_pids
-                    if (numRead != 0) {
-                        for (int i = 0; i < CHILD_NUM; i++) {
-                            if (is_near[i] != 0 && is_near[i] != getpid()) {
+                    // printf("fuori dal while\n");
+                    // eseguo il corpo del for per ogni messaggio in msgs
+                    for (int i = 0; i < cont; i++) {
+                        printf("sono nel for\n");
+                        new_Message(&msg_buff, msgs[cont].pid_sender,
+                                    msgs[cont].pid_receiver,
+                                    msgs[cont].message_id, msgs[cont].message,
+                                    msgs[cont].max_distance);
+                        print_message(&msg_buff);
+
+                        printf("distance : %f", msg_buff.max_distance);
+
+                        // trovo i vicini
+                        // printf("cerco i vicini\n");
+                        int is_near[CHILD_NUM] = {0};
+                        if (x != -1 && y != -1) {
+                            semOp(semBoardId, 0, -1);
+                            nearby_pids(board, BOARD_SIZE, BOARD_SIZE, x, y,
+                                        msg_buff.max_distance, is_near,
+                                        CHILD_NUM);
+                            semOp(semBoardId, 0, 1);
+                        }
+                        printf("vicini : %d,%d,%d,%d,%d\n", is_near[0],
+                               is_near[1], is_near[2], is_near[3], is_near[4]);
+                        // send message to nearby_pids
+                        for (int j = 0; j < CHILD_NUM; j++) {
+                            if (is_near[j] != 0 && is_near[j] != getpid()) {
+                                printf("ci sono dei vicini\n");
                                 // change sender and receiver
                                 msg_buff.pid_sender = getpid();
-                                msg_buff.pid_receiver = is_near[i];
+                                msg_buff.pid_receiver = is_near[j];
                                 // check if device has already received the
                                 // mesage by checking on ack list
                                 semOp(semAckListId, 0, -1);
@@ -190,7 +217,7 @@ int main(int argc, char *argv[]) {
                                 if (isAckedArray == 0) {
                                     char nearby_fifo_path[SIZE_FIFO_PATH];
                                     get_fifo_path_child(nearby_fifo_path,
-                                                        is_near[i]);
+                                                        is_near[j]);
                                     int nearby_fifo_fd =
                                         open_fifo(nearby_fifo_path,
                                                   O_WRONLY | O_NONBLOCK);
@@ -200,11 +227,79 @@ int main(int argc, char *argv[]) {
                             }
                         }
                     }
-                    if (child == 0) {
-                        pause();
-                    }
-                    // possibly move
-                    // if (move == 1) {
+
+                    // initialize variables
+
+                    // semOp(semIdMatrix, 0, -1);
+                    // del_arr(idMatrix->m[child], MAX_ID, msg_buff.message_id);
+                    // semOp(semIdMatrix, 0, 1);
+
+                    // set_zero_Message(&msg_buff);
+
+                    // // receive message from pipe
+                    // int numRead =
+                    //     read_fifo(child_fifo_fd, &msg_buff, sizeof(Message));
+
+                    // int dist = 0;
+                    // if (numRead == sizeof(Message)) {
+                    //     dist = msg_buff.max_distance;
+
+                    //     // aggiungo id del messaggio nella matrice degli id
+                    //     semOp(semIdMatrix, 0, -1);
+                    //     add_arr(idMatrix->m[child], MAX_ID,
+                    //             msg_buff.message_id);
+                    //     semOp(semIdMatrix, 0, 1);
+
+                    //     // crea l ack
+                    //     Acknowledgment ack_buff;
+                    //     new_Acknowledgment(&ack_buff, msg_buff.pid_sender,
+                    //                        msg_buff.pid_receiver,
+                    //                        msg_buff.message_id, time(NULL));
+                    //     semOp(semAckListId, 0, -1);
+                    //     if (add_ackArray(&ack_buff, ackList->arr, MAX_ACK) ==
+                    //         -1)
+                    //         numRead = 0;
+                    //     semOp(semAckListId, 0, 1);
+                    // }
+
+                    // // find nerby devices
+                    // int is_near[CHILD_NUM];
+                    // set_zero(is_near, CHILD_NUM);
+                    // if (x != -1 && y != -1) {
+                    //     semOp(semBoardId, 0, -1);
+                    //     nearby_pids(board, BOARD_SIZE, BOARD_SIZE, x, y,
+                    //     dist,
+                    //                 is_near, CHILD_NUM);
+                    //     semOp(semBoardId, 0, 1);
+                    // }
+                    // // send message to nearby_pids
+                    // if (numRead == sizeof(Message)) {
+                    //     for (int i = 0; i < CHILD_NUM; i++) {
+                    //         if (is_near[i] != 0 && is_near[i] != getpid()) {
+                    //             // change sender and receiver
+                    //             msg_buff.pid_sender = getpid();
+                    //             msg_buff.pid_receiver = is_near[i];
+                    //             // check if device has already received the
+                    //             // mesage by checking on ack list
+                    //             semOp(semAckListId, 0, -1);
+                    //             int isAckedArray = is_ackedArray(
+                    //                 &msg_buff, ackList->arr, MAX_ACK);
+                    //             semOp(semAckListId, 0, 1);
+                    //             if (isAckedArray == 0) {
+                    //                 char nearby_fifo_path[SIZE_FIFO_PATH];
+                    //                 get_fifo_path_child(nearby_fifo_path,
+                    //                                     is_near[i]);
+                    //                 int nearby_fifo_fd =
+                    //                     open_fifo(nearby_fifo_path,
+                    //                               O_WRONLY | O_NONBLOCK);
+                    //                 write_fifo(nearby_fifo_fd, &msg_buff,
+                    //                            sizeof(Message));
+                    //             }
+                    //         }
+                    //     }
+                    // }
+
+                    if (child == 0) pause();
                     semOp(semProcId, child, -1);
                     if (x != -1 && y != -1) {
                         semOp(semBoardId, 0, -1);
@@ -218,126 +313,92 @@ int main(int argc, char *argv[]) {
                     semOp(semBoardId, 0, -1);
                     set_table_val(board, x, y, getpid());
                     semOp(semBoardId, 0, 1);
-                    move = 0;
                     child == 4 ? semOp(semProcId, 0, 1)
                                : semOp(semProcId, child + 1, 1);
-                    //}
                 }
                 exit(0);
             }
         }
-        sleep(1);
         while (1) {
-            // sleep(1);
             step++;
             int numRead = read(pos_fd, posLine, LINE_SIZE);
             if (numRead == -1) ErrExit("error reading position file");
             if (numRead == 0) printf("<server> File posizioni terminato\n");
             if (numRead > 0) {
-                //  kill(pid_child[0], SIGUSR1);
-                //  kill(pid_child[1], SIGUSR1);
-                //  kill(pid_child[2], SIGUSR1);
-                //  kill(pid_child[3], SIGUSR1);
-                //  kill(pid_child[4], SIGUSR1);
                 kill(pid_child[0], SIGCONT);
             }
-            // sleep(1);
             sleep(2);
             semOp(semBoardId, 0, -1);
+            semOp(semIdMatrix, 0, -1);
             print_board_status(board, BOARD_SIZE, BOARD_SIZE, &pid_child[0],
-                               DEV_NUM, step);
+                               DEV_NUM, idMatrix, step);
+            semOp(semIdMatrix, 0, 1);
             semOp(semBoardId, 0, 1);
         }
     }
     return 0;
 }
 void init() {
-    // Allocate a shared memory segment for board
-    printf("<Server> allocating a shared memory segment for board\n");
     shmBoardId =
         alloc_shared_memory(IPC_PRIVATE, sizeof(int) * BOARD_SIZE * BOARD_SIZE);
-    // Attach the shared memory segment for board
-    printf("<Server> attaching the shared memory segment for board\n");
     board = (int *)get_shared_memory(shmBoardId, 0);
-    // Allocate a shared memory segment for scharing positin (sever ->
-    // childern)
-    printf("<Server> allocating a shared memory segment for board\n");
-    shmPosId = alloc_shared_memory(IPC_PRIVATE, sizeof(char) * LINE_SIZE);
-    // Attach shared memory segment for scharing positin (sever -> childern)
-    printf("<Server> attaching the shared memory segment for board\n");
-    posLine = (char *)get_shared_memory(shmPosId, 0);
-    // Allocate a shared memory segment for acknowledgment list
-    printf(
-        "<Server> allocating a shared memory segment for acknowledgment "
-        "list\n");
-    shmAckListId = alloc_shared_memory(IPC_PRIVATE, sizeof(AckList));
-    // Attach the shared memory segment for acknowledgment list
-    printf(
-        "<Server> attaching the shared memory segment acknowledgment "
-        "list\n");
-    ackList = (AckList *)get_shared_memory(shmAckListId, 0);
-    // Create a semaphore for board access
-    printf("<Server> creating a semaphore set for board access.\n");
     semBoardId = create_sem_set(1);
-    // Set semaphore at 1 to allow board access
-    printf("<Server> Setting board semaphore to 1.\n");
     semOp(semBoardId, 0, 1);
-    // Create a semaphore for ack list access
-    printf("<Server> creating a semaphore set for ack list access.\n");
-    semAckListId = create_sem_set(1);
-    // Set semaphore at 1 to allow ack list access
-    printf("<Server> Setting ack list semaphore to 1.\n");
-    semOp(semAckListId, 0, 1);
-    // Create a semaphore set of 5 for process syncronization
-    printf("<Server> creating a semaphore set for process syncronization\n");
-    semProcId = create_sem_set(5);
-    // Set semaphore at 1 to allow first process to start
-    printf("<Server> Setting first process semaphore to 1.\n");
-    semOp(semProcId, 0, 1);
 
+    shmIdMatrix = alloc_shared_memory(IPC_PRIVATE, sizeof(IdMatrix));
+    idMatrix = (IdMatrix *)get_shared_memory(shmIdMatrix, 0);
+    semIdMatrix = create_sem_set(1);
+    semOp(semIdMatrix, 0, 1);
+
+    shmPosId = alloc_shared_memory(IPC_PRIVATE, sizeof(char) * LINE_SIZE);
+    posLine = (char *)get_shared_memory(shmPosId, 0);
     semPosId = create_sem_set(1);
     semOp(semPosId, 0, 1);
 
-    // Create file for message ids
-    printf("<Server> Creating file for message id check\n");
+    shmAckListId = alloc_shared_memory(IPC_PRIVATE, sizeof(AckList));
+    ackList = (AckList *)get_shared_memory(shmAckListId, 0);
+    semAckListId = create_sem_set(1);
+    semOp(semAckListId, 0, 1);
+
+    semProcId = create_sem_set(5);
+    semOp(semProcId, 0, 1);
+
     usedIdFileDs = open(USED_ID_PATH, O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
     if (usedIdFileDs == -1) printf("Error creating file for used id\n");
-
-    // Create semaphore for file message ids
     semFileId = create_sem_set_by_key(SEM_ID_FILE_KEY, 1);
     semOp(semFileId, 0, 1);
 }
 void quit() {
-    printf("<Server> Terminating AckManager.\n");
     kill(ackManager, SIGTERM);
-    printf("<Server> Terminating all child processes.\n");
     kill(pid_child[0], SIGTERM);
     kill(pid_child[1], SIGTERM);
     kill(pid_child[2], SIGTERM);
     kill(pid_child[3], SIGTERM);
     kill(pid_child[4], SIGTERM);
-    printf("<Server> Closing list position file.\n");
+
     if (close(pos_fd) == -1) printf("error closing file descriptor");
-    printf("<Server> Deleting semaphores.\n");
+
+    free_shared_memory(board);
+    free_shared_memory(ackList);
+    free_shared_memory(idMatrix);
+
+    remove_shared_memory(shmBoardId);
+    remove_shared_memory(shmAckListId);
+
+    close(usedIdFileDs);
+    unlink(USED_ID_PATH);
+
     delete_sem_set(semBoardId);
     delete_sem_set(semProcId);
     delete_sem_set(semPosId);
     delete_sem_set(semFileId);
-    printf("<Server> Dataching memory.\n");
-    free_shared_memory(board);
-    free_shared_memory(ackList);
-    printf("<Server> Removing memory.\n");
-    remove_shared_memory(shmBoardId);
-    remove_shared_memory(shmAckListId);
-    printf("<Server> Removing file for message id.\n");
-    close(usedIdFileDs);
-    unlink(USED_ID_PATH);
+    delete_sem_set(semIdMatrix);
+
     exit(0);
 }
 void serverSigHandler(int sig) { quit(); }
 void childSigHandler(int sig) {
     if (sig == SIGTERM) {
-        printf("<Child> SIGTERM ricevuto\n");
         close_fifo(child_fifo_fd);
         unlink_fifo(child_fifo_path);
         exit(0);
@@ -345,8 +406,6 @@ void childSigHandler(int sig) {
 }
 void ackManagerSigHandler(int sig) {
     if (sig == SIGTERM) {
-        printf("<Ack> SIGTERM ricevuto\n");
-        printf("<Ack> Deleting message queue\n");
         if (msgctl(msqid, IPC_RMID, NULL) == -1)
             ErrExit("Message queue could not be deleted.\n");
         exit(0);

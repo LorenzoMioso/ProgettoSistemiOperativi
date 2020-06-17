@@ -186,6 +186,7 @@ void nearby_pids(int *mat, int row, int col, int x, int y, int max_dist,
                 int pid = get_table_val(mat, i, j);
                 if (pid != 0) {
                     is_near[k] = pid;
+                    //  printf("trovato vicino!\n");
                     k++;
                 }
             }
@@ -194,16 +195,14 @@ void nearby_pids(int *mat, int row, int col, int x, int y, int max_dist,
 double dist_euclid(int x1, int y1, int x2, int y2) {
     return sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
 }
-void set_zero(int arr[], int size) {
-    for (int i = 0; i < size; i++) arr[i] = 0;
-}
 void print_board_status(int *board, int col, int row, int *pidArr, size_t size,
-                        int step) {
+                        IdMatrix *idMatrix, int step) {
     printf("Step %d: device positions ########################\n", step);
     for (int i = 0; i < size; i++) {
-        int x = -1, y = -1;
+        int x, y;
         where_table_val(board, row, col, &x, &y, *(pidArr + i));
-        printf("%d %d %d\n", *(pidArr + i), x, y);
+        printf("%d %d %d ", *(pidArr + i), x, y);
+        print_array(idMatrix->m[i], 10);
     }
     printf("#################################################\n");
 }
@@ -221,4 +220,38 @@ void new_Message(Message *msg, pid_t sender, pid_t receiver, int id,
     msg->message_id = id;
     strcpy(msg->message, message);
     msg->max_distance = max_distance;
+}
+void set_zero_Message(Message *msg) {
+    msg->pid_sender = 0;
+    msg->pid_receiver = 0;
+    msg->message_id = 0;
+    strcpy(msg->message, "");
+    msg->max_distance = 0;
+}
+void set_zero(int arr[], int size) {
+    for (int i = 0; i < size; i++) arr[i] = 0;
+}
+void add_arr(int arr[], int size, int val) {
+    for (int i = 0; i < size; i++)
+        if (arr[i] == 0) {
+            arr[i] = val;
+            break;
+        }
+}
+void del_arr(int arr[], int size, int val) {
+    for (int i = 0; i < size; i++)
+        if (arr[i] == val) {
+            arr[i] = 0;
+            break;
+        }
+}
+void print_array(int *arr, int size) {
+    int i;
+    printf("[");
+    for (i = 0; i < size; i++) {
+        if (*(arr + i) != 0) {
+            printf("%d ", *(arr + i));
+        }
+    }
+    printf("]\n");
 }

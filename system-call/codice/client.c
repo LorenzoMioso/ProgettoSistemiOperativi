@@ -141,8 +141,7 @@ int main(int argc, char* argv[]) {
         // creo il file
         char filePath[20];
         sprintf(filePath, "out_%d.txt", msg_id);
-        int fileds =
-            open(filePath, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+        int fileds = open(filePath, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
         if (fileds == -1)
             printf("Error creating file\n");
         else

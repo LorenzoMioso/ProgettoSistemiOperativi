@@ -10,6 +10,7 @@
 #pragma once
 
 #define MAX_ACK 100
+#define MAX_ID 100
 #define DEV_NUM 5
 typedef struct {
     pid_t pid_sender;
@@ -35,9 +36,13 @@ typedef struct {
     Acknowledgment arr[DEV_NUM];
 } AckQueue;  // messaggio nella queue contente i 5 ack
 
+typedef struct {
+    int m[DEV_NUM][MAX_ID];
+} IdMatrix;  // matrice che conterrà gli id dei messaggi letti
+
 // funzioni per la board
 void print_board_status(int *board, int col, int row, int *pidArr, size_t size,
-                        int step);
+                        IdMatrix *idMatrix, int step);
 void print_board(int *mat, int row, int col);
 void set_table_val(int *mat, int x, int y, int val);
 int get_table_val(int *mat, int x, int y);
@@ -50,6 +55,7 @@ void nearby_pids(int *mat, int row, int col, int x, int y, int max_dist,
 void print_message(Message *m);
 void new_Message(Message *msg, pid_t sender, pid_t receiver, int id,
                  char *message, double max_distance);
+void set_zero_Message(Message *msg);
 int is_ackedArray(Message *msg, Acknowledgment *ack_arr, size_t size);
 int ackedMsgToString(Message *msg, Acknowledgment *ack_list, size_t size,
                      char *buff);
@@ -75,7 +81,10 @@ void print_ackQueue(AckList *ack_list, size_t size);
 void setAckQueue(Acknowledgment *ack_arr_q, size_t size_arr_q,
                  Acknowledgment *ack_arr, size_t size_arr, int message_id);
 
-// altro
+// array utils
 void set_zero(int arr[], int size);
+void add_arr(int arr[], int size, int val);
+void del_arr(int arr[], int size, int val);
+void print_array(int *arr, int size);
 
 #endif
