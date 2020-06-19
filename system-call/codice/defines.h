@@ -40,6 +40,10 @@ typedef struct {
     int m[DEV_NUM][MAX_ID];
 } IdMatrix;  // matrice che conterrà gli id dei messaggi letti
 
+typedef struct {
+    int a[MAX_ID];
+} ConfirmedList;
+
 // funzioni per la board
 void print_board_status(int *board, int col, int row, int *pidArr, size_t size,
                         IdMatrix *idMatrix, int step);
@@ -55,10 +59,16 @@ void nearby_pids(int *mat, int row, int col, int x, int y, int max_dist,
 void print_message(Message *m);
 void new_Message(Message *msg, pid_t sender, pid_t receiver, int id,
                  char *message, double max_distance);
+int add_messageArray(Message *msg, Message *msg_arr, size_t size);
+int exists_messageArray(Message *msg, Message *msg_arr, size_t size);
+void print_messageArray(Message *msg_arr, size_t size);
 void set_zero_Message(Message *msg);
 int is_ackedArray(Message *msg, Acknowledgment *ack_arr, size_t size);
+int count_ackedId(int msg_id, Acknowledgment *ack_arr, size_t size);
 int ackedMsgToString(Message *msg, Acknowledgment *ack_list, size_t size,
                      char *buff);
+int eq_message(Message *msg1, Message *msg2);
+void del_messageById(int message_id, Message *msg_arr, size_t size);
 
 // funzioni per gli ack
 void new_Acknowledgment(Acknowledgment *ack, pid_t sender, pid_t receiver,
@@ -84,7 +94,8 @@ void setAckQueue(Acknowledgment *ack_arr_q, size_t size_arr_q,
 // array utils
 void set_zero(int arr[], int size);
 void add_arr(int arr[], int size, int val);
+int exists_arr(int arr[], int size, int val);
 void del_arr(int arr[], int size, int val);
 void print_array(int *arr, int size);
-
+void set_idArray(int *arr, Message *msg_arr, int size);
 #endif

@@ -49,33 +49,58 @@ int ackedMsgToString(Message *msg, Acknowledgment *ack_list, size_t size,
     }
     return i;
 }
-// if ack1 == ack2 return 1
-// else return 0
+// if ack1 == ack2 return 0
+// else return -1
 int eq_acknowledgement(Acknowledgment *ack1, Acknowledgment *ack2) {
     if (ack1->message_id == ack2->message_id &&
         ack1->pid_receiver == ack2->pid_receiver &&
         ack1->pid_sender == ack2->pid_sender)
-        return 1;
-    return 0;
+        return 0;
+    return -1;
+}
+// if msg1 == msg2 return 0
+// else return -1
+int eq_message(Message *msg1, Message *msg2) {
+    if (msg1->message_id == msg2->message_id) {
+        return 0;
+    }
+    return -1;
 }
 
 void print_ackArray(Acknowledgment *ack_arr, size_t size) {
     Acknowledgment null = {0};
     for (int i = 0; i < size; i++)
-        if (eq_acknowledgement(ack_arr + i, &null) == 0)
+        if (eq_acknowledgement(ack_arr + i, &null) != 0)
             print_acknowledgement(ack_arr + i);
 }
+void print_messageArray(Message *msg_arr, size_t size) {
+    Message null = {0};
+    for (int i = 0; i < size; i++)
+        if (eq_message(msg_arr + i, &null) != 0) print_message(msg_arr + i);
+}
 int add_ackArray(Acknowledgment *ack, Acknowledgment *ack_arr, size_t size) {
-    if (exists_ackArray(ack, ack_arr, size) == 0) {
+    if (exists_ackArray(ack, ack_arr, size) != 0) {
         Acknowledgment null = {0};
         for (int i = 0; i < size; i++)
-            if (eq_acknowledgement(ack_arr + i, &null) == 1) {
+            if (eq_acknowledgement(ack_arr + i, &null) == 0) {
                 *(ack_arr + i) = *ack;
                 return 0;
             }
     }
     return -1;
 }
+int add_messageArray(Message *msg, Message *msg_arr, size_t size) {
+    if (exists_messageArray(msg, msg_arr, size) != 0) {
+        Message null = {0};
+        for (int i = 0; i < size; i++)
+            if (eq_message(msg_arr + i, &null) == 0) {
+                *(msg_arr + i) = *msg;
+                return 0;
+            }
+    }
+    return -1;
+}
+
 int del_ackArray(Acknowledgment *ack, Acknowledgment *ack_arr, size_t size) {
     Acknowledgment null = {0};
     for (int i = 0; i < size; i++)
@@ -92,40 +117,59 @@ void del_ackArrayById(int message_id, Acknowledgment *ack_arr, size_t size) {
             *(ack_arr + i) = null;
         }
 }
+void del_messageById(int message_id, Message *msg_arr, size_t size) {
+    for (int i = 0; i < size; i++)
+        if ((msg_arr + i)->message_id == message_id) {
+            set_zero_Message(msg_arr + i);
+        }
+}
+// if exists return 0
+// else return -1
 int exists_ackArray(Acknowledgment *ack, Acknowledgment *ack_arr, size_t size) {
     for (int i = 0; i < size; i++)
         if (eq_acknowledgement(ack_arr + i, ack) == 0) return 0;
-    return 1;
+    return -1;
+}
+int exists_messageArray(Message *msg, Message *msg_arr, size_t size) {
+    for (int i = 0; i < size; i++)
+        if (eq_message(msg_arr + i, msg) == 0) {
+            return 0;
+        }
+    return -1;
 }
 // controlla nell array degli ack se c'è gia una conferma del messaggio
 // confrontando id e pid_receiver
 int is_ackedArray(Message *msg, Acknowledgment *ack_arr, size_t size) {
     Acknowledgment null = {0};
     for (int i = 0; i < size; i++) {
-        if (eq_acknowledgement(ack_arr + i, &null) == 0) {
+        if (eq_acknowledgement(ack_arr + i, &null) != 0) {
             Acknowledgment ack = *(ack_arr + i);
             if (ack.message_id == msg->message_id &&
                 ack.pid_receiver == msg->pid_receiver) {
-                return 1;
+                return 0;
             }
         }
     }
-    return 0;
+    return -1;
 }
 int is_emptyArray(Acknowledgment *ack_arr, size_t size) {
     Acknowledgment null = {0};
     for (int i = 0; i < size; i++)
-        if (eq_acknowledgement(ack_arr + i, &null) == 0) return 0;
-    return 1;
+        if (eq_acknowledgement(ack_arr + i, &null) != 0) return -1;
+    return 0;
 }
+// ritorna un id confermato 5 volte
+// altrimenti -1
 int idAckedByAll(Acknowledgment *ack_arr, size_t size) {
-    if (is_emptyArray(ack_arr, size) == 1) return 0;
+    if (is_emptyArray(ack_arr, size) == 0) {
+        return -1;
+    }
     int cont = 0;
     Acknowledgment check = {0};
     Acknowledgment null = {0};
     // prendo il primo ack diverso da 0
     for (int i = 0; i < size; i++) {
-        if (eq_acknowledgement(ack_arr + i, &null) == 0) {
+        if (eq_acknowledgement(ack_arr + i, &null) != 0) {
             check = *(ack_arr + i);
             break;
         }
@@ -137,7 +181,13 @@ int idAckedByAll(Acknowledgment *ack_arr, size_t size) {
             if (cont == DEV_NUM) return check.message_id;
         }
     }
-    return 0;
+    return -1;
+}
+int count_ackedId(int msg_id, Acknowledgment *ack_arr, size_t size) {
+    int count = 0;
+    for (int i = 0; i < size; i++)
+        if ((ack_arr + i)->message_id == msg_id) count++;
+    return count;
 }
 void setAckQueue(Acknowledgment *ack_arr_q, size_t size_arr_q,
                  Acknowledgment *ack_arr, size_t size_arr, int message_id) {
@@ -202,7 +252,7 @@ void print_board_status(int *board, int col, int row, int *pidArr, size_t size,
         int x, y;
         where_table_val(board, row, col, &x, &y, *(pidArr + i));
         printf("%d %d %d ", *(pidArr + i), x, y);
-        print_array(idMatrix->m[i], 10);
+        print_array(idMatrix->m[i], 18);
     }
     printf("#################################################\n");
 }
@@ -245,6 +295,11 @@ void del_arr(int arr[], int size, int val) {
             break;
         }
 }
+int exists_arr(int arr[], int size, int val) {
+    for (int i = 0; i < size; i++)
+        if (arr[i] == val) return 0;
+    return -1;
+}
 void print_array(int *arr, int size) {
     int i;
     printf("[");
@@ -254,4 +309,9 @@ void print_array(int *arr, int size) {
         }
     }
     printf("]\n");
+}
+void set_idArray(int *arr, Message *msg_arr, int size) {
+    for (int i = 0; i < size; i++) {
+        arr[i] = msg_arr[i].message_id;
+    }
 }
