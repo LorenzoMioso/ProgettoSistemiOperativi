@@ -81,15 +81,13 @@ int main(int argc, char *argv[]) {
     if (pos_fd == -1) printf("File %s does not exist\n", argv[2]);
 
     init();
-    // Remove otger signals
+    // Remove other signals
     sigset_t mySet;
     sigfillset(&mySet);
-    // sigdelset(&mySet, SIGTERM);
-    sigdelset(&mySet, SIGINT);
+    sigdelset(&mySet, SIGTERM);
     sigprocmask(SIG_SETMASK, &mySet, &prevSet);
     // Set signal handler
-    // if (signal(SIGTERM, serverSigHandler) == SIG_ERR)
-    if (signal(SIGINT, serverSigHandler) == SIG_ERR)
+    if (signal(SIGTERM, serverSigHandler) == SIG_ERR)
         ErrExit("change signal handler failed");
     // Start ack manager
     ackManager = fork();
@@ -97,7 +95,7 @@ int main(int argc, char *argv[]) {
         printf("Ack Manager not created!\n");
     } else if (ackManager == 0) {
         // Set normal signal mask
-        sigprocmask(SIG_SETMASK, &prevSet, NULL);
+        sigprocmask(SIG_SETMASK, &mySet, NULL);
         // set signal handler
         if (signal(SIGTERM, ackManagerSigHandler) == SIG_ERR)
             ErrExit("change signal handler failed");
@@ -136,11 +134,12 @@ int main(int argc, char *argv[]) {
             if (pid_child[child] == -1)
                 printf("child %d not created!", child);
             else if (pid_child[child] == 0) {
-                // Set normal signal mask
+                // Set only sigcont and sigterm
+                sigdelset(&prevSet, SIGCONT);
+                sigdelset(&prevSet, SIGTERM);
                 sigprocmask(SIG_SETMASK, &prevSet, NULL);
                 // set signal handler
-                if (signal(SIGUSR1, childSigHandler) == SIG_ERR ||
-                    signal(SIGTERM, childSigHandler) == SIG_ERR ||
+                if (signal(SIGTERM, childSigHandler) == SIG_ERR ||
                     signal(SIGCONT, childSigHandler) == SIG_ERR)
                     ErrExit("change signal handler failed");
                 // create device fifo
@@ -199,9 +198,6 @@ int main(int argc, char *argv[]) {
                                     int isAckedArray = is_ackedArray(
                                         &msg_buff, ackList->arr, MAX_ACK);
                                     semOp(semAckListId, 0, 1);
-                                    //  printf("child%d isAckedArray %d\n",
-                                    //  child,
-                                    //       isAckedArray);
                                     if (isAckedArray != 0) {
                                         char nearby_fifo_path[SIZE_FIFO_PATH];
                                         get_fifo_path_child(nearby_fifo_path,
@@ -244,7 +240,7 @@ int main(int argc, char *argv[]) {
             int numRead = read(pos_fd, posLine, LINE_SIZE);
             if (numRead == -1) ErrExit("error reading position file");
             if (numRead == 0) {
-                printf("<server> File posizioni terminato\n");
+                printf("<server> End of position file!\n");
                 kill(pid_child[0], SIGCONT);
             }
             if (numRead > 0) kill(pid_child[0], SIGCONT);

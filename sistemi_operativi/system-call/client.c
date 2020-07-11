@@ -24,8 +24,6 @@
 
 int is_valid_id(int usedIdFileDs, int id);
 int append_id(int usedIdFileDs, int id);
-int is_num(char* num);
-int is_great_zero(int num);
 int is_valid_fifo(int pid);
 
 int main(int argc, char* argv[]) {
@@ -50,20 +48,20 @@ int main(int argc, char* argv[]) {
     int dev_pid;
     int fifo_fd;
     do {
-        printf("Insersci il pid del device a cui vuoi connetterti : ");
+        printf("Insert pid of device fifo : ");
         scanf("%s", str_dev_pid);
         dev_pid = atoi(str_dev_pid);
         if (dev_pid == 0) {
-            printf("Numero non valido!\n");
+            printf("Not a valid number!\n");
             continue;
         }
         if (dev_pid <= 0) {
-            printf("Devi inserire un numero maggiore di 0!\n");
+            printf("Must be greater than zero!\n");
             continue;
         }
         fifo_fd = is_valid_fifo(dev_pid);
         if (fifo_fd == -1) {
-            printf("La fifo non esiste!\n");
+            printf("Fifo does not exits!\n");
             continue;
         }
     } while (dev_pid <= 0 || fifo_fd == -1);
@@ -73,22 +71,22 @@ int main(int argc, char* argv[]) {
     int msg_id;
     int idIsValid;
     do {
-        printf("Insersci id del messaggio : ");
+        printf("Insert message id : ");
         scanf("%s", str_msg_id);
         msg_id = atoi(str_msg_id);
         if (msg_id == 0) {
-            printf("Numero non valido!\n");
+            printf("Not a valid number!\n");
             continue;
         }
         if (msg_id <= 0) {
-            printf("Devi inserire un numero maggiore di 0!\n");
+            printf("Must be greater than zero!\n");
             continue;
         }
         semOp(semFileId, 0, -1);
         idIsValid = is_valid_id(usedIdFileDs, msg_id);
         semOp(semFileId, 0, 1);
         if (idIsValid == 1) {
-            printf("Id già utilizato!\n");
+            printf("Id already used!\n");
             continue;
         }
     } while (msg_id <= 0 || idIsValid != 0);
@@ -98,37 +96,39 @@ int main(int argc, char* argv[]) {
     append_id(usedIdFileDs, msg_id);
     semOp(semFileId, 0, 1);
 
+    close(usedIdFileDs);
+
     // imput message
     char msg_txt[256];
-    printf("Insersci testo del messaggio : ");
+    printf("Insert text message : ");
     scanf("%s", msg_txt);
 
     // input distanza con controlli
     char str_msg_dist[INT_DIGIT_NUM * 2];
     double msg_dist = 0;
     do {
-        printf("Insersci la distanza del messaggio : ");
+        printf("Insert message distance : ");
         scanf("%s", str_msg_dist);
         msg_dist = atof(str_msg_dist);
         if (msg_dist == 0) {
-            printf("Numero non valido!\n");
+            printf("Not a valid number!\n");
             continue;
         }
         if (msg_dist <= 0) {
-            printf("Devi inserire un numero maggiore di 0!\n");
+            printf("Must be greater than zero!\n");
             continue;
         }
     } while (msg_dist <= 0);
 
-    // message creation
+    // creo il messaggio
     Message msg;
     new_Message(&msg, getpid(), dev_pid, msg_id, msg_txt, msg_dist);
 
     int numWrite = write(fifo_fd, &msg, sizeof(Message));
     if (numWrite == -1) printf("error writing message\n");
-    if (numWrite == 0) printf("non e stato scritto nulla\n");
+    if (numWrite == 0) printf("nothing has ben written\n");
     if (numWrite == sizeof(Message)) {
-        printf("Attendo le conferme...\n");
+        printf("Waiting confirmations...\n");
         // creo un buffer per il messaggio della queue
         AckQueue q;
         size_t gSize = sizeof(AckQueue) - sizeof(long);
@@ -145,9 +145,11 @@ int main(int argc, char* argv[]) {
         if (fileds == -1)
             printf("Error creating file\n");
         else
-            // scrivo gli ack nel file
             write(fileds, out, num);
+
+        close(fileds);
     }
+    printf("Done.\n");
     return 0;
 }
 int is_valid_id(int usedIdFileDs, int id) {
@@ -178,22 +180,6 @@ int append_id(int usedIdFileDs, int id) {
     strcat(str_num, "\n");
     lseek(usedIdFileDs, 0, SEEK_END);
     return write(usedIdFileDs, str_num, strlen(str_num));
-}
-int is_num(char* num) {
-    int n = 0;
-    n = atoi(num);
-    if (n == 0) {
-        printf("Non hai inserito un numero\n");
-        return 0;
-    }
-    return n;
-}
-int is_great_zero(int num) {
-    if (num <= 0) {
-        printf("Non hai inserito un numero maggiore di 0\n");
-        return 0;
-    }
-    return 1;
 }
 int is_valid_fifo(int pid) {
     char fifo_name[22];
